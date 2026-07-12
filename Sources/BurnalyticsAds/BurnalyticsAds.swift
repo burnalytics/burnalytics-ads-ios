@@ -180,7 +180,7 @@ actor BurnalyticsAdsClient {
         var urlRequest = URLRequest(url: endpoint)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.setValue("BurnalyticsAds-iOS/(configuration.sdkVersion)", forHTTPHeaderField: "User-Agent")
+        urlRequest.setValue("BurnalyticsAds-iOS/\(configuration.sdkVersion)", forHTTPHeaderField: "User-Agent")
 
         let payload = AdRequest(
             appID: configuration.appID,
