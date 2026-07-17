@@ -24,7 +24,7 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
     let url: URL
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(allowedHost: url.host)
+        Coordinator(creativeURL: url)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -47,15 +47,15 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         guard webView.url != url else { return }
-        context.coordinator.allowedHost = url.host
+        context.coordinator.creativeURL = url
         webView.load(URLRequest(url: url))
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
-        var allowedHost: String?
+        var creativeURL: URL
 
-        init(allowedHost: String?) {
-            self.allowedHost = allowedHost
+        init(creativeURL: URL) {
+            self.creativeURL = creativeURL
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -78,14 +78,12 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
                 return
             }
 
-            if destination.scheme == "about" || destination.host == allowedHost {
+            if destination.scheme == "about" || destination == creativeURL {
                 decisionHandler(.allow)
                 return
             }
 
-            if destination.scheme == "https" || destination.scheme == "http" {
-                UIApplication.shared.open(destination)
-            }
+            openExternally(destination)
             decisionHandler(.cancel)
         }
 
@@ -96,14 +94,14 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
             if let destination = navigationAction.request.url {
-                if destination.host == allowedHost {
-                    webView.load(URLRequest(url: destination))
-                } else if destination.scheme == "https" || destination.scheme == "http" {
-                    UIApplication.shared.open(destination)
-                }
+                openExternally(destination)
             }
             return nil
         }
+
+        private func openExternally(_ destination: URL) {
+            guard destination.scheme == "https" || destination.scheme == "http" else { return }
+            UIApplication.shared.open(destination)
+        }
     }
 }
-

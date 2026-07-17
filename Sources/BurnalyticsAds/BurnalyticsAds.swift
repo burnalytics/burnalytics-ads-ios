@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 public enum BurnalyticsAds {
-    public static let sdkVersion = "1.0.0"
+    public static let sdkVersion = "1.0.1"
 
     private(set) static var appID = ""
     private(set) static var baseURL = URL(string: "https://www.burnalytics.com")!
