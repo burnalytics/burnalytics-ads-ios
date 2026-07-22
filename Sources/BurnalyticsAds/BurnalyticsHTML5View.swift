@@ -22,9 +22,11 @@ final class BurnalyticsWebViewEnvironment {
 
 struct BurnalyticsHTML5View: UIViewRepresentable {
     let url: URL
+    let onLoad: () -> Void
+    let onFailure: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(creativeURL: url)
+        Coordinator(creativeURL: url, onLoad: onLoad, onFailure: onFailure)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -46,6 +48,8 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
     }
 
     func updateUIView(_ webView: WKWebView, context: Context) {
+        context.coordinator.onLoad = onLoad
+        context.coordinator.onFailure = onFailure
         guard webView.url != url else { return }
         context.coordinator.creativeURL = url
         webView.load(URLRequest(url: url))
@@ -53,9 +57,13 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         var creativeURL: URL
+        var onLoad: () -> Void
+        var onFailure: () -> Void
 
-        init(creativeURL: URL) {
+        init(creativeURL: URL, onLoad: @escaping () -> Void, onFailure: @escaping () -> Void) {
             self.creativeURL = creativeURL
+            self.onLoad = onLoad
+            self.onFailure = onFailure
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -65,7 +73,21 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
                 options: [.beginFromCurrentState, .allowUserInteraction]
             ) {
                 webView.alpha = 1
+            } completion: { [weak self] _ in
+                self?.onLoad()
             }
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            onFailure()
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            onFailure()
+        }
+
+        func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            onFailure()
         }
 
         func webView(

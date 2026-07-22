@@ -4,7 +4,8 @@ public struct BurnalyticsBannerView: View {
     let slotID: String
 
     @State private var ad: BurnalyticsBannerAd?
-    @State private var errorMessage: String?
+    @State private var isLoading = true
+    @State private var creativeLoaded = false
     @State private var trackedRequestID: String?
 
     public init(slotID: String) {
@@ -15,11 +16,11 @@ public struct BurnalyticsBannerView: View {
         Group {
             if let ad {
                 banner(ad)
-            } else if let errorMessage {
-                unavailable(message: errorMessage)
-            } else {
+            } else if isLoading {
                 Color.clear
                     .frame(width: 320, height: 50)
+            } else {
+                EmptyView()
             }
         }
         .task(id: slotID) {
@@ -30,7 +31,11 @@ public struct BurnalyticsBannerView: View {
     private func banner(_ ad: BurnalyticsBannerAd) -> some View {
         ZStack(alignment: .bottomTrailing) {
             if ad.creative.type == "html5", let htmlURL = ad.creative.htmlURL {
-                BurnalyticsHTML5View(url: htmlURL)
+                BurnalyticsHTML5View(
+                    url: htmlURL,
+                    onLoad: { creativeDidLoad(ad) },
+                    onFailure: { creativeDidFail(ad) }
+                )
             } else if let imageURL = ad.creative.imageURL {
                 Link(destination: ad.creative.clickURL) {
                     AsyncImage(url: imageURL) { phase in
@@ -39,12 +44,10 @@ public struct BurnalyticsBannerView: View {
                             image
                                 .resizable()
                                 .scaledToFit()
+                                .onAppear { creativeDidLoad(ad) }
                         case .failure:
-                            Color.black.overlay {
-                                Text("Ad unavailable")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
+                            Color.clear
+                                .onAppear { creativeDidFail(ad) }
                         default:
                             Color.clear
                         }
@@ -52,73 +55,71 @@ public struct BurnalyticsBannerView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Color.black.overlay {
-                    Text("Ad unavailable")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Color.clear
+                    .onAppear { creativeDidFail(ad) }
             }
 
-            Link(destination: ad.disclosure.aboutURL) {
-                Text(ad.disclosure.label)
-                    .font(.system(size: 9, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [.orange, .red],
-                                    startPoint: .top,
-                                    endPoint: .bottom
+            if creativeLoaded {
+                Link(destination: ad.disclosure.aboutURL) {
+                    Text(ad.disclosure.label)
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.orange, .red],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
                                 )
-                            )
-                    )
-                    .overlay {
-                        Capsule().stroke(.yellow.opacity(0.9), lineWidth: 1)
-                    }
+                        )
+                        .overlay {
+                            Capsule().stroke(.yellow.opacity(0.9), lineWidth: 1)
+                        }
+                }
+                .buttonStyle(.plain)
+                .padding(4)
             }
-            .buttonStyle(.plain)
-            .padding(4)
         }
         .frame(
             width: CGFloat(ad.creative.width),
             height: CGFloat(ad.creative.height)
         )
         .clipped()
-        .task(id: ad.requestID) {
-            guard trackedRequestID != ad.requestID else { return }
-            trackedRequestID = ad.requestID
-            await BurnalyticsAdsClient.shared.recordImpression(ad.tracking.impressionURL)
-        }
         .accessibilityLabel(ad.creative.alt)
     }
 
-    private func unavailable(message: String) -> some View {
-        RoundedRectangle(cornerRadius: 8)
-            .fill(.quaternary)
-            .frame(width: 320, height: 50)
-            .overlay {
-                Text(message)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(8)
-            }
+    private func creativeDidLoad(_ loadedAd: BurnalyticsBannerAd) {
+        guard ad?.requestID == loadedAd.requestID else { return }
+        creativeLoaded = true
+        guard trackedRequestID != loadedAd.requestID else { return }
+        trackedRequestID = loadedAd.requestID
+        Task {
+            await BurnalyticsAdsClient.shared.recordImpression(loadedAd.tracking.impressionURL)
+        }
+    }
+
+    private func creativeDidFail(_ failedAd: BurnalyticsBannerAd) {
+        guard ad?.requestID == failedAd.requestID else { return }
+        ad = nil
+        isLoading = false
+        creativeLoaded = false
     }
 
     private func load() async {
         ad = nil
-        errorMessage = nil
+        isLoading = true
+        creativeLoaded = false
         trackedRequestID = nil
         do {
             ad = try await BurnalyticsAdsClient.shared.loadBanner(slotID: slotID)
-        } catch BurnalyticsAdsError.noFill {
-            errorMessage = "No ad available"
+            isLoading = false
         } catch {
-            errorMessage = error.localizedDescription
+            ad = nil
+            isLoading = false
         }
     }
 }
-
