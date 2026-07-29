@@ -1,6 +1,6 @@
 # Burnalytics Ads SDK for iOS
 
-Official Burnalytics Ads SDK for iOS apps. Serve Burnalytics banner, HTML5, image interstitial, and video interstitial ads from SwiftUI.
+Official Burnalytics Ads SDK for iOS apps. Serve Burnalytics banner, HTML5, image interstitial, video interstitial, and rewarded video ads from SwiftUI.
 
 ## Requirements
 
@@ -102,6 +102,33 @@ Preload ads before showing them:
 ```swift
 BurnalyticsAds.preloadBanner(slotID: "4165549702")
 BurnalyticsAds.preloadInterstitial(slotID: "5207566349")
+BurnalyticsAds.preloadRewardedAd(slotID: "YOUR_REWARDED_SLOT_ID")
+```
+
+## Rewarded Video Ads
+
+Present a rewarded video from a `rewarded_video` slot. The callback runs only after the video reaches the end; closing the ad early does not grant the reward.
+
+```swift
+import SwiftUI
+import BurnalyticsAds
+
+struct ContentView: View {
+    @State private var showRewardedAd = false
+    @State private var coins = 0
+
+    var body: some View {
+        Button("Watch ad for 10 coins") {
+            showRewardedAd = true
+        }
+        .burnalyticsRewardedAd(
+            slotID: "YOUR_REWARDED_SLOT_ID",
+            isPresented: $showRewardedAd
+        ) {
+            coins += 10
+        }
+    }
+}
 ```
 
 ## Test IDs
@@ -119,6 +146,7 @@ Video Interstitial Slot ID: 5207566349
 
 - Impression tracking is handled automatically.
 - Interstitial close controls are handled by the SDK.
+- Reward callbacks fire only after a rewarded video finishes playback.
 - HTML5 banner rendering can be disabled per slot in the Burnalytics publisher dashboard.
 
 ## License

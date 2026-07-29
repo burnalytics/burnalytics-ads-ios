@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 public enum BurnalyticsAds {
-    public static let sdkVersion = "1.0.1"
+    public static let sdkVersion = "1.1.0"
 
     private(set) static var appID = ""
     private(set) static var baseURL = URL(string: "https://www.burnalytics.com")!
@@ -23,6 +23,12 @@ public enum BurnalyticsAds {
     public static func preloadInterstitial(slotID: String) {
         Task {
             _ = try? await BurnalyticsAdsClient.shared.loadInterstitial(slotID: slotID)
+        }
+    }
+
+    public static func preloadRewardedAd(slotID: String) {
+        Task {
+            _ = try? await BurnalyticsAdsClient.shared.loadRewardedAd(slotID: slotID)
         }
     }
 }
@@ -112,6 +118,7 @@ actor BurnalyticsAdsClient {
     private let cacheLifetime: TimeInterval = 5 * 60
     private var bannerCache: [String: (ad: BurnalyticsBannerAd, loadedAt: Date)] = [:]
     private var interstitialCache: [String: (ad: BurnalyticsBannerAd, loadedAt: Date)] = [:]
+    private var rewardedAdCache: [String: (ad: BurnalyticsBannerAd, loadedAt: Date)] = [:]
 
     private struct AdRequest: Encodable {
         let appID: String
@@ -159,6 +166,23 @@ actor BurnalyticsAdsClient {
 
     func consumeInterstitial(slotID: String) {
         interstitialCache[slotID] = nil
+    }
+
+    func loadRewardedAd(slotID: String) async throws -> BurnalyticsBannerAd {
+        if let cached = rewardedAdCache[slotID],
+           Date().timeIntervalSince(cached.loadedAt) < cacheLifetime {
+            return cached.ad
+        }
+        let ad = try await requestAd(slotID: slotID)
+        guard ad.format == "rewarded_video", ad.creative.type == "video" else {
+            throw BurnalyticsAdsError.invalidResponse
+        }
+        rewardedAdCache[slotID] = (ad, Date())
+        return ad
+    }
+
+    func consumeRewardedAd(slotID: String) {
+        rewardedAdCache[slotID] = nil
     }
 
     private func requestAd(slotID: String) async throws -> BurnalyticsBannerAd {
