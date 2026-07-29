@@ -149,6 +149,8 @@ Video Interstitial Slot ID: 5207566349
 - Reward callbacks fire only after a rewarded video finishes playback.
 - Rewarded-video completion tracking is sent automatically before the app reward callback runs.
 - When the server zone uses completion billing, closing early does not consume a paid campaign view.
+- Rewarded-video Skip timing is controlled by the server zone: 5, 15, 30 seconds, or full playback.
+- Using Skip closes the ad without firing the reward callback.
 - HTML5 banner rendering can be disabled per slot in the Burnalytics publisher dashboard.
 
 ## License

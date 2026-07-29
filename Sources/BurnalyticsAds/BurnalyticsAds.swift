@@ -2,7 +2,7 @@ import Foundation
 
 @MainActor
 public enum BurnalyticsAds {
-    public static let sdkVersion = "1.1.0"
+    public static let sdkVersion = "1.1.1"
 
     private(set) static var appID = ""
     private(set) static var baseURL = URL(string: "https://www.burnalytics.com")!
@@ -80,6 +80,7 @@ nonisolated struct BurnalyticsBannerAd: Decodable, Identifiable {
 
     let requestID: String
     let format: String
+    let skipDelaySeconds: Int?
     let creative: Creative
     let tracking: Tracking
     let disclosure: Disclosure
@@ -87,6 +88,7 @@ nonisolated struct BurnalyticsBannerAd: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case requestID = "request_id"
         case format
+        case skipDelaySeconds = "skip_delay_seconds"
         case creative
         case tracking
         case disclosure

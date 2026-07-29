@@ -67,9 +67,17 @@ private struct BurnalyticsRewardedAdView: View {
     @Binding var isPresented: Bool
     let onReward: () -> Void
 
-    @State private var secondsUntilClose = 3
+    @State private var secondsUntilSkip: Int?
     @State private var tracked = false
     @State private var rewardGranted = false
+
+    init(ad: BurnalyticsBannerAd, isPresented: Binding<Bool>, onReward: @escaping () -> Void) {
+        self.ad = ad
+        _isPresented = isPresented
+        self.onReward = onReward
+        let delay = ad.skipDelaySeconds ?? 5
+        _secondsUntilSkip = State(initialValue: delay == 0 ? nil : max(delay, 0))
+    }
 
     var body: some View {
         ZStack {
@@ -93,23 +101,28 @@ private struct BurnalyticsRewardedAdView: View {
 
                     Spacer()
 
-                    Button {
-                        isPresented = false
-                    } label: {
-                        Group {
-                            if secondsUntilClose > 0 {
-                                Text("\(secondsUntilClose)")
-                            } else {
-                                Image(systemName: "xmark")
+                    if secondsUntilSkip != nil {
+                        Button {
+                            isPresented = false
+                        } label: {
+                            Group {
+                                if let secondsUntilSkip, secondsUntilSkip > 0 {
+                                    Text("\(secondsUntilSkip)")
+                                        .frame(width: 36, height: 36)
+                                        .background(.black.opacity(0.7), in: Circle())
+                                } else {
+                                    Text("Skip")
+                                        .padding(.horizontal, 13)
+                                        .frame(height: 36)
+                                        .background(.black.opacity(0.7), in: Capsule())
+                                }
                             }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
                         }
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 36, height: 36)
-                        .foregroundStyle(.white)
-                        .background(.black.opacity(0.7), in: Circle())
+                        .disabled((secondsUntilSkip ?? 0) > 0)
+                        .accessibilityLabel(skipAccessibilityLabel)
                     }
-                    .disabled(secondsUntilClose > 0)
-                    .accessibilityLabel(secondsUntilClose > 0 ? "Close available in \(secondsUntilClose) seconds" : "Close ad")
                 }
                 .padding()
 
@@ -142,12 +155,22 @@ private struct BurnalyticsRewardedAdView: View {
                 tracked = true
                 await BurnalyticsAdsClient.shared.recordImpression(ad.tracking.impressionURL)
             }
-            while secondsUntilClose > 0 {
+            while let seconds = secondsUntilSkip, seconds > 0 {
                 try? await Task.sleep(for: .seconds(1))
                 guard !Task.isCancelled else { return }
-                secondsUntilClose -= 1
+                secondsUntilSkip = seconds - 1
             }
         }
+    }
+
+    private var skipAccessibilityLabel: String {
+        guard let secondsUntilSkip else {
+            return "Skip available after the video finishes"
+        }
+        if secondsUntilSkip > 0 {
+            return "Skip available in \(secondsUntilSkip) seconds"
+        }
+        return "Skip ad"
     }
 
     private func grantReward() {
