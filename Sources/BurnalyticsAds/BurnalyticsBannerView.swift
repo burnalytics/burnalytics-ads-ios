@@ -1,15 +1,21 @@
 import SwiftUI
+import UIKit
 
 public struct BurnalyticsBannerView: View {
     let slotID: String
+    let onEvent: (BurnalyticsAdEvent) -> Void
 
     @State private var ad: BurnalyticsBannerAd?
     @State private var isLoading = true
     @State private var creativeLoaded = false
     @State private var trackedRequestID: String?
 
-    public init(slotID: String) {
+    public init(
+        slotID: String,
+        onEvent: @escaping (BurnalyticsAdEvent) -> Void = { _ in }
+    ) {
         self.slotID = slotID
+        self.onEvent = onEvent
     }
 
     public var body: some View {
@@ -34,10 +40,14 @@ public struct BurnalyticsBannerView: View {
                 BurnalyticsHTML5View(
                     url: htmlURL,
                     onLoad: { creativeDidLoad(ad) },
-                    onFailure: { creativeDidFail(ad) }
+                    onFailure: { creativeDidFail(ad) },
+                    onClick: { onEvent(.clicked) }
                 )
             } else if let imageURL = ad.creative.imageURL {
-                Link(destination: ad.creative.clickURL) {
+                Button {
+                    onEvent(.clicked)
+                    UIApplication.shared.open(ad.creative.clickURL)
+                } label: {
                     AsyncImage(url: imageURL) { phase in
                         switch phase {
                         case .success(let image):
@@ -97,6 +107,8 @@ public struct BurnalyticsBannerView: View {
         creativeLoaded = true
         guard trackedRequestID != loadedAd.requestID else { return }
         trackedRequestID = loadedAd.requestID
+        onEvent(.loaded)
+        onEvent(.impression)
         Task {
             await BurnalyticsAdsClient.shared.recordImpression(loadedAd.tracking.impressionURL)
         }
@@ -107,6 +119,7 @@ public struct BurnalyticsBannerView: View {
         ad = nil
         isLoading = false
         creativeLoaded = false
+        onEvent(.failed(.creativeFailed))
     }
 
     private func load() async {
@@ -120,6 +133,7 @@ public struct BurnalyticsBannerView: View {
         } catch {
             ad = nil
             isLoading = false
+            onEvent(.failed(.from(error)))
         }
     }
 }

@@ -9,7 +9,10 @@ let package = Package(
         .library(name: "BurnalyticsAds", targets: ["BurnalyticsAds"])
     ],
     targets: [
-        .target(name: "BurnalyticsAds"),
+        .target(
+            name: "BurnalyticsAds",
+            resources: [.process("Resources")]
+        ),
         .testTarget(name: "BurnalyticsAdsTests", dependencies: ["BurnalyticsAds"])
     ]
 )

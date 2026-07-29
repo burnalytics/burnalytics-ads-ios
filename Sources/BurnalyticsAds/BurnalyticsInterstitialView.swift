@@ -1,9 +1,11 @@
-import SwiftUI
 import AVKit
+import SwiftUI
+import UIKit
 
 struct BurnalyticsInterstitialPresenter: ViewModifier {
     let slotID: String
     @Binding var isPresented: Bool
+    let onEvent: (BurnalyticsAdEvent) -> Void
 
     @State private var ad: BurnalyticsBannerAd?
 
@@ -12,7 +14,11 @@ struct BurnalyticsInterstitialPresenter: ViewModifier {
             .fullScreenCover(isPresented: $isPresented, onDismiss: clear) {
                 Group {
                     if let ad {
-                        BurnalyticsInterstitialView(ad: ad, isPresented: $isPresented)
+                        BurnalyticsInterstitialView(
+                            ad: ad,
+                            isPresented: $isPresented,
+                            onEvent: onEvent
+                        )
                     } else {
                         Color.black
                             .ignoresSafeArea()
@@ -25,7 +31,9 @@ struct BurnalyticsInterstitialPresenter: ViewModifier {
     private func load() async {
         do {
             ad = try await BurnalyticsAdsClient.shared.loadInterstitial(slotID: slotID)
+            onEvent(.loaded)
         } catch {
+            onEvent(.failed(.from(error)))
 #if DEBUG
             print("Burnalytics interstitial slot \(slotID) failed: \(error.localizedDescription)")
 #endif
@@ -34,20 +42,34 @@ struct BurnalyticsInterstitialPresenter: ViewModifier {
     }
 
     private func clear() {
+        if ad != nil {
+            onEvent(.dismissed)
+        }
         ad = nil
         Task { await BurnalyticsAdsClient.shared.consumeInterstitial(slotID: slotID) }
     }
 }
 
 public extension View {
-    func burnalyticsInterstitial(slotID: String, isPresented: Binding<Bool>) -> some View {
-        modifier(BurnalyticsInterstitialPresenter(slotID: slotID, isPresented: isPresented))
+    func burnalyticsInterstitial(
+        slotID: String,
+        isPresented: Binding<Bool>,
+        onEvent: @escaping (BurnalyticsAdEvent) -> Void = { _ in }
+    ) -> some View {
+        modifier(
+            BurnalyticsInterstitialPresenter(
+                slotID: slotID,
+                isPresented: isPresented,
+                onEvent: onEvent
+            )
+        )
     }
 }
 
 private struct BurnalyticsInterstitialView: View {
     let ad: BurnalyticsBannerAd
     @Binding var isPresented: Bool
+    let onEvent: (BurnalyticsAdEvent) -> Void
 
     @State private var secondsRemaining = 3
     @State private var tracked = false
@@ -59,7 +81,10 @@ private struct BurnalyticsInterstitialView: View {
             if ad.creative.type == "video", let videoURL = ad.creative.videoURL {
                 BurnalyticsVideoPlayer(url: videoURL)
             } else if let imageURL = ad.creative.imageURL {
-                Link(destination: ad.creative.clickURL) {
+                Button {
+                    onEvent(.clicked)
+                    UIApplication.shared.open(ad.creative.clickURL)
+                } label: {
                     AsyncImage(url: imageURL) { phase in
                         if case .success(let image) = phase {
                             image.resizable().scaledToFit()
@@ -107,7 +132,10 @@ private struct BurnalyticsInterstitialView: View {
                 Spacer()
 
                 if ad.creative.type == "video" {
-                    Link(destination: ad.creative.clickURL) {
+                    Button {
+                        onEvent(.clicked)
+                        UIApplication.shared.open(ad.creative.clickURL)
+                    } label: {
                         Text("Learn more")
                             .font(.headline)
                             .foregroundStyle(.white)
@@ -124,6 +152,7 @@ private struct BurnalyticsInterstitialView: View {
         .task(id: ad.requestID) {
             if !tracked {
                 tracked = true
+                onEvent(.impression)
                 await BurnalyticsAdsClient.shared.recordImpression(ad.tracking.impressionURL)
             }
             while secondsRemaining > 0 {

@@ -6,6 +6,7 @@ import UIKit
 struct BurnalyticsRewardedAdPresenter: ViewModifier {
     let slotID: String
     @Binding var isPresented: Bool
+    let onEvent: (BurnalyticsAdEvent) -> Void
     let onReward: () -> Void
 
     @State private var ad: BurnalyticsBannerAd?
@@ -18,6 +19,7 @@ struct BurnalyticsRewardedAdPresenter: ViewModifier {
                         BurnalyticsRewardedAdView(
                             ad: ad,
                             isPresented: $isPresented,
+                            onEvent: onEvent,
                             onReward: onReward
                         )
                     } else {
@@ -32,7 +34,9 @@ struct BurnalyticsRewardedAdPresenter: ViewModifier {
     private func load() async {
         do {
             ad = try await BurnalyticsAdsClient.shared.loadRewardedAd(slotID: slotID)
+            onEvent(.loaded)
         } catch {
+            onEvent(.failed(.from(error)))
 #if DEBUG
             print("Burnalytics rewarded ad slot \(slotID) failed: \(error.localizedDescription)")
 #endif
@@ -41,6 +45,9 @@ struct BurnalyticsRewardedAdPresenter: ViewModifier {
     }
 
     private func clear() {
+        if ad != nil {
+            onEvent(.dismissed)
+        }
         ad = nil
         Task { await BurnalyticsAdsClient.shared.consumeRewardedAd(slotID: slotID) }
     }
@@ -50,12 +57,14 @@ public extension View {
     func burnalyticsRewardedAd(
         slotID: String,
         isPresented: Binding<Bool>,
+        onEvent: @escaping (BurnalyticsAdEvent) -> Void = { _ in },
         onReward: @escaping () -> Void
     ) -> some View {
         modifier(
             BurnalyticsRewardedAdPresenter(
                 slotID: slotID,
                 isPresented: isPresented,
+                onEvent: onEvent,
                 onReward: onReward
             )
         )
@@ -65,15 +74,22 @@ public extension View {
 private struct BurnalyticsRewardedAdView: View {
     let ad: BurnalyticsBannerAd
     @Binding var isPresented: Bool
+    let onEvent: (BurnalyticsAdEvent) -> Void
     let onReward: () -> Void
 
     @State private var secondsUntilSkip: Int?
     @State private var tracked = false
     @State private var rewardGranted = false
 
-    init(ad: BurnalyticsBannerAd, isPresented: Binding<Bool>, onReward: @escaping () -> Void) {
+    init(
+        ad: BurnalyticsBannerAd,
+        isPresented: Binding<Bool>,
+        onEvent: @escaping (BurnalyticsAdEvent) -> Void,
+        onReward: @escaping () -> Void
+    ) {
         self.ad = ad
         _isPresented = isPresented
+        self.onEvent = onEvent
         self.onReward = onReward
         let delay = ad.skipDelaySeconds ?? 5
         _secondsUntilSkip = State(initialValue: delay == 0 ? nil : max(delay, 0))
@@ -103,6 +119,7 @@ private struct BurnalyticsRewardedAdView: View {
 
                     if secondsUntilSkip != nil {
                         Button {
+                            onEvent(.skipped)
                             isPresented = false
                         } label: {
                             Group {
@@ -136,7 +153,10 @@ private struct BurnalyticsRewardedAdView: View {
                         .padding(.vertical, 8)
                         .background(.black.opacity(0.65), in: Capsule())
 
-                    Link(destination: ad.creative.clickURL) {
+                    Button {
+                        onEvent(.clicked)
+                        UIApplication.shared.open(ad.creative.clickURL)
+                    } label: {
                         Text("Learn more")
                             .font(.headline)
                             .foregroundStyle(.white)
@@ -153,6 +173,7 @@ private struct BurnalyticsRewardedAdView: View {
         .task(id: ad.requestID) {
             if !tracked {
                 tracked = true
+                onEvent(.impression)
                 await BurnalyticsAdsClient.shared.recordImpression(ad.tracking.impressionURL)
             }
             while let seconds = secondsUntilSkip, seconds > 0 {
@@ -180,6 +201,7 @@ private struct BurnalyticsRewardedAdView: View {
             if let completionURL = ad.tracking.completionURL {
                 await BurnalyticsAdsClient.shared.recordCompletion(completionURL)
             }
+            onEvent(.rewarded)
             onReward()
             isPresented = false
         }

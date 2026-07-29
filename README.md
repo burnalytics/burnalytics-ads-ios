@@ -105,6 +105,41 @@ BurnalyticsAds.preloadInterstitial(slotID: "5207566349")
 BurnalyticsAds.preloadRewardedAd(slotID: "YOUR_REWARDED_SLOT_ID")
 ```
 
+## Lifecycle Events
+
+All formats support an optional typed event callback:
+
+```swift
+BurnalyticsBannerView(slotID: "4165549702") { event in
+    switch event {
+    case .loaded:
+        print("Banner loaded")
+    case .impression:
+        print("Banner impression")
+    case .clicked:
+        print("Banner clicked")
+    case .failed(let error):
+        print("Banner failed: \(error.localizedDescription)")
+    default:
+        break
+    }
+}
+```
+
+Interstitial and rewarded modifiers accept the same `onEvent` callback:
+
+```swift
+.burnalyticsInterstitial(
+    slotID: "2911997583",
+    isPresented: $showInterstitial,
+    onEvent: { event in
+        print(event)
+    }
+)
+```
+
+Supported events are `loaded`, `impression`, `clicked`, `skipped`, `dismissed`, `failed`, and `rewarded`. Existing integrations can omit `onEvent` without changing their code.
+
 ## Rewarded Video Ads
 
 Present a rewarded video from a `rewarded_video` slot. The callback runs only after the video reaches the end; closing the ad early does not grant the reward.
@@ -123,7 +158,12 @@ struct ContentView: View {
         }
         .burnalyticsRewardedAd(
             slotID: "YOUR_REWARDED_SLOT_ID",
-            isPresented: $showRewardedAd
+            isPresented: $showRewardedAd,
+            onEvent: { event in
+                if case .skipped = event {
+                    print("The user skipped without earning a reward")
+                }
+            }
         ) {
             coins += 10
         }
@@ -144,6 +184,7 @@ Video Interstitial Slot ID: 5207566349
 
 ## Notes
 
+- The package includes an Apple privacy manifest and declares that it does not track users.
 - Impression tracking is handled automatically.
 - Interstitial close controls are handled by the SDK.
 - Reward callbacks fire only after a rewarded video finishes playback.
@@ -152,6 +193,7 @@ Video Interstitial Slot ID: 5207566349
 - Rewarded-video Skip timing is controlled by the server zone: 5, 15, 30 seconds, or full playback.
 - Using Skip closes the ad without firing the reward callback.
 - HTML5 banner rendering can be disabled per slot in the Burnalytics publisher dashboard.
+- The `rewarded` lifecycle event and the existing `onReward` closure describe the same completed reward. Grant the reward in one place only.
 
 ## License
 

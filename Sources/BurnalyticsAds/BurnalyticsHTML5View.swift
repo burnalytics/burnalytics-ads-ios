@@ -24,9 +24,10 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
     let url: URL
     let onLoad: () -> Void
     let onFailure: () -> Void
+    let onClick: () -> Void
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(creativeURL: url, onLoad: onLoad, onFailure: onFailure)
+        Coordinator(creativeURL: url, onLoad: onLoad, onFailure: onFailure, onClick: onClick)
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -50,6 +51,7 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
     func updateUIView(_ webView: WKWebView, context: Context) {
         context.coordinator.onLoad = onLoad
         context.coordinator.onFailure = onFailure
+        context.coordinator.onClick = onClick
         guard webView.url != url else { return }
         context.coordinator.creativeURL = url
         webView.load(URLRequest(url: url))
@@ -59,11 +61,18 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
         var creativeURL: URL
         var onLoad: () -> Void
         var onFailure: () -> Void
+        var onClick: () -> Void
 
-        init(creativeURL: URL, onLoad: @escaping () -> Void, onFailure: @escaping () -> Void) {
+        init(
+            creativeURL: URL,
+            onLoad: @escaping () -> Void,
+            onFailure: @escaping () -> Void,
+            onClick: @escaping () -> Void
+        ) {
             self.creativeURL = creativeURL
             self.onLoad = onLoad
             self.onFailure = onFailure
+            self.onClick = onClick
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -123,6 +132,7 @@ struct BurnalyticsHTML5View: UIViewRepresentable {
 
         private func openExternally(_ destination: URL) {
             guard destination.scheme == "https" || destination.scheme == "http" else { return }
+            onClick()
             UIApplication.shared.open(destination)
         }
     }

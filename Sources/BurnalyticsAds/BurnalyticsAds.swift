@@ -1,8 +1,51 @@
 import Foundation
 
+public enum BurnalyticsAdEvent: Sendable, Equatable {
+    case loaded
+    case impression
+    case clicked
+    case skipped
+    case dismissed
+    case failed(BurnalyticsAdsError)
+    case rewarded
+}
+
+public enum BurnalyticsAdsError: Error, LocalizedError, Sendable, Equatable {
+    case notConfigured
+    case invalidResponse
+    case noFill
+    case creativeFailed
+    case network(String)
+    case server(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .notConfigured:
+            return "Burnalytics Ads has not been configured."
+        case .invalidResponse:
+            return "The ad server returned an invalid response."
+        case .noFill:
+            return "No ad is available for this placement."
+        case .creativeFailed:
+            return "The ad creative could not be displayed."
+        case .network(let message):
+            return message
+        case .server(let message):
+            return message
+        }
+    }
+
+    static func from(_ error: Error) -> BurnalyticsAdsError {
+        if let error = error as? BurnalyticsAdsError {
+            return error
+        }
+        return .network(error.localizedDescription)
+    }
+}
+
 @MainActor
 public enum BurnalyticsAds {
-    public static let sdkVersion = "1.1.1"
+    public static let sdkVersion = "1.2.0"
 
     private(set) static var appID = ""
     private(set) static var baseURL = URL(string: "https://www.burnalytics.com")!
@@ -95,26 +138,6 @@ nonisolated struct BurnalyticsBannerAd: Decodable, Identifiable {
     }
 
     var id: String { requestID }
-}
-
-enum BurnalyticsAdsError: LocalizedError {
-    case notConfigured
-    case invalidResponse
-    case noFill
-    case server(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .notConfigured:
-            return "Burnalytics Ads has not been configured."
-        case .invalidResponse:
-            return "The ad server returned an invalid response."
-        case .noFill:
-            return "No ad is available for this placement."
-        case .server(let message):
-            return message
-        }
-    }
 }
 
 actor BurnalyticsAdsClient {
