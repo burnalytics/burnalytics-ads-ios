@@ -60,9 +60,11 @@ nonisolated struct BurnalyticsBannerAd: Decodable, Identifiable {
 
     struct Tracking: Decodable {
         let impressionURL: URL
+        let completionURL: URL?
 
         enum CodingKeys: String, CodingKey {
             case impressionURL = "impression_url"
+            case completionURL = "completion_url"
         }
     }
 
@@ -231,6 +233,14 @@ actor BurnalyticsAdsClient {
     }
 
     func recordImpression(_ url: URL) async {
+        await recordTrackingEvent(url)
+    }
+
+    func recordCompletion(_ url: URL) async {
+        await recordTrackingEvent(url)
+    }
+
+    private func recordTrackingEvent(_ url: URL) async {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         _ = try? await URLSession.shared.data(for: request)

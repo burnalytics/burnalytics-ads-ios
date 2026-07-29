@@ -153,8 +153,13 @@ private struct BurnalyticsRewardedAdView: View {
     private func grantReward() {
         guard !rewardGranted else { return }
         rewardGranted = true
-        onReward()
-        isPresented = false
+        Task {
+            if let completionURL = ad.tracking.completionURL {
+                await BurnalyticsAdsClient.shared.recordCompletion(completionURL)
+            }
+            onReward()
+            isPresented = false
+        }
     }
 }
 

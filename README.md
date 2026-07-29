@@ -147,6 +147,8 @@ Video Interstitial Slot ID: 5207566349
 - Impression tracking is handled automatically.
 - Interstitial close controls are handled by the SDK.
 - Reward callbacks fire only after a rewarded video finishes playback.
+- Rewarded-video completion tracking is sent automatically before the app reward callback runs.
+- When the server zone uses completion billing, closing early does not consume a paid campaign view.
 - HTML5 banner rendering can be disabled per slot in the Burnalytics publisher dashboard.
 
 ## License
